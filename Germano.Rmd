@@ -1,0 +1,158 @@
+---
+title: "Arvore de Regressão"
+output: html_notebook
+---
+
+                                      ÁRVORE DE REGRESSÃO
+
+
+
+
+As árvores de decisão são modelos baseados em conjunções e disjunções de regras que podem facilmente ser representadas sob a forma de uma árvore. 
+Neste trabalho utiliso arvore de decisão para resolver um problema de Regressão (arvore de regressão).
+
+Consideremos os dados "Song popularity Data" do "Kaggle", pretende-se criar um modelo preditivo da popularidade de musicas "Song popularity Data" com base em determinadas variaveis como a energia, a acustica, a instrumentalidade, a vivacidade, entre outros. A arvore de regressao é guiado pelo RMSE e não por medidas de impureza.
+
+
+
+```{r}
+#__________________________________________________
+# Carregue o conjunto de dados:
+song_data <- read.csv("data/song_data.csv")#chama o conjunto de dados
+View(song_data) #para visualizar o conjunto de dados
+
+```
+
+
+
+
+Vamos eliminar a primeira coluna nos dados
+```{r}
+song_data1=song_data[,-1]
+View(song_data1)
+```
+
+Vamos dividir o conjunto de dados em dados de treio e de teste.
+```{r}
+library(readr) #clamar o pacote readr
+getwd()
+```
+
+```{r}
+#___________
+set.seed(1234) #fazer a mesma divisão dos conjuntos de teste e
+#treino sempre que se executa o código
+ind.tr=sample(1:nrow(song_data1),0.7*nrow(song_data))
+song.tr=song_data1[ind.tr,] #Dados para treino
+song.te=song_data1[-ind.tr,] #Dados para teste
+
+```
+
+
+Existem diferentes pacotes para modelar com árvores de decisão. Aqui usaremos o tree.
+
+
+```{r}
+
+install.packages("tree") #instalar o pacote tree (diz se a arvore é de classificação ou de regressão)
+library(tree) #chamar o pacote tree
+``` 
+
+
+Ajustamos uma árvore de regressão:
+
+
+```{r}
+song.tree=tree(song_popularity~.,data=song.tr) #ajusta uma árvore
+summary(song.tree) # faz um resumo da árvore ajustada
+```
+
+A função tree identificou automaticamente que se trata de um problema de regressao  e as variâveis que ganharam os nós para construir a árvore são "instrumentalness", "loudness" e "energy"  . De facto, as árvores de decisão têm esta vantagem: apenas utilizam as variáveis essenciais para resolver o problema (efetuam uma seleção de variáveis). A árvore contém 4 folhas e tem um erro de treino de cerca de 455 em Média.
+
+```{r}
+plot(song.tree) #Apresenta as linhas da árvore
+text(song.tree,pretty=0)#acrescenta  as variáveis que ganharam cara nó e as condições
+```
+    1.1- O PROCESSO DE PODA
+    
+Avaliamos agora a possibilidade de obter ganhos com a poda da árvore:
+
+```{r}
+song.tree.cv=cv.tree(song.tree) #aplica o processo da poda
+song.tree.cv # faz um resumo do processo aplicado
+```
+
+
+Neste caso, a árvore original é a de melhor performance (ela apresenta menor erro com 4 folhas), pelo que não se aplica qualquer estratégia de poda. 
+
+
+Podemos assim avaliar no conjunto de teste:
+
+```{r}
+pred=predict(song.tree,newdata=song.te) #avalia o madelo criado no conjunto de teste.
+
+sqrt(mean((pred-song.te$song_popularity)^2))# calcula RMSE (podemos utilizar o MAPE para obter os erros em percentágens)
+
+```
+ 1.2-A ÁRVIRE TMAX
+
+Mas, e se os critérios de paragem pré-estabelecidos no R são demasiado exigentes? Poderá a árvore construída com 4 folhas não ser a melhor porque o processo de construção terminou cedo demais? Podemos sempre forçar a árvore Tmax e aplicar a estratégia de poda.
+```{r}
+song.tmax=tree(song_popularity~.,data=song.tr, control = tree.control(nrow(song.tr),mindev=0.0005,minsize=2))
+# mindev- controla o erro mínimo após a divisão.
+#minsize-define o tamanho mínimo do nó antes da divisão.~
+summary(song.tmax)# apresenta o resumo da árvore criada
+```
+
+
+A árvore obtida tem 350 folhas e um erro de aproximadamente  307. Á seguir temos duas representações em que apenas uma apresenta as variáveis que ganhou cada nó.
+
+```{r}
+plot(song.tmax) #Apresenta as linhas da árvore
+```
+```{r}
+plot(song.tmax) #Apresenta as linhas da árvore
+text(song.tmax,pretty=0)#acrescenta  as variáveis que ganharam cara nó e as condições.
+```
+
+1.3- A PODA DA ÁRVIRE TMAX
+
+Aplicamos agora a estratégia de poda:
+
+```{r}
+song.tmax.cv=cv.tree(song.tmax) #aplica a poda
+song.tmax.cv # faz um resumo da processo de poda
+```
+Como podemos observar, entre 4 e 350 folhas a quantidade de erro é sempre a mesma (6044785) tornando- se óbvio que a árvore com 4 folhas tem a mesma performance 350 folhas. Vejamos este resultado no gráfico que se segue:
+
+```{r}
+plot(song.tmax.cv$size,song.tmax.cv$dev,type="b")
+#O comando "type" especifica o tipo de gráfico. Neste caso, "b" 
+#indica que quero um gráfico de disperssão com linhas conectando
+#os pontos.
+```
+Já sabemos que entre perfórmances semelhantes é preferível o modelo mais ssímples.
+Portanto, devemos podar a árvore de forma que fique com apenas 4 folhas.
+
+Vamos aplicar a poda.
+
+
+```{r}
+prune.song.tmax.tree = prune.tree(song.tmax, best = 4, method = "deviance") # aplicar a pode de forma que a árvore podada tenha 4 folhas, conforme indicado no processo.
+plot(prune.song.tmax.tree) #Apresenta as linhas da árvore
+text(prune.song.tmax.tree,pretty=0) #acrescenta  as variáveis que ganharam cara nó e as condições.
+```
+Cocluimos que a árvore óptima tem mesmo quatro folhas.
+
+
+
+
+
+
+
+
+
+
+
+
+
